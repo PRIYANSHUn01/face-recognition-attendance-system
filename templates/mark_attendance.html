@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}Mark Attendance - Face Recognition Attendance System{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white text-center">
+                <h3 class="mb-0">
+                    <i class="fas fa-camera me-2"></i>Mark Attendance
+                </h3>
+                <small>Use face recognition to mark your attendance</small>
+            </div>
+            <div class="card-body p-4">
+                <!-- Camera Section -->
+                <div class="mb-4">
+                    <div class="border rounded p-3 bg-dark">
+                        <div class="text-center mb-3">
+                            <video id="video" width="500" height="375" autoplay class="rounded border d-none"></video>
+                            <canvas id="canvas" width="500" height="375" class="rounded border d-none"></canvas>
+                            <div id="cameraPlaceholder" class="bg-secondary rounded d-flex align-items-center justify-content-center" style="width: 500px; height: 375px; margin: 0 auto;">
+                                <div class="text-center">
+                                    <i class="fas fa-camera fa-4x text-muted mb-3"></i>
+                                    <h5 class="text-muted">Click "Start Camera" to begin</h5>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center">
+                            <button type="button" id="startCamera" class="btn btn-outline-primary btn-lg me-2">
+                                <i class="fas fa-video me-2"></i>Start Camera
+                            </button>
+                            <button type="button" id="markAttendance" class="btn btn-success btn-lg d-none">
+                                <i class="fas fa-check me-2"></i>Mark Attendance
+                            </button>
+                            <button type="button" id="stopCamera" class="btn btn-warning btn-lg d-none">
+                                <i class="fas fa-stop me-2"></i>Stop Camera
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <div class="alert alert-info">
+                            <i class="fas fa-brain me-2 text-primary"></i>
+                            <strong>AI Deep Learning Face Recognition:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>Advanced neural network algorithms analyze your facial features</li>
+                                <li>Multi-dimensional feature extraction using LBP, Gabor, and PCA</li>
+                                <li>Position your face clearly in front of the camera for optimal AI analysis</li>
+                                <li>Ensure good lighting for enhanced deep learning accuracy</li>
+                                <li>Click "Mark Attendance" when ready</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Status Section -->
+                <div id="statusSection" class="mb-4">
+                    <div id="recognitionStatus" class="text-center">
+                        <div class="d-flex justify-content-center align-items-center">
+                            <i class="fas fa-clock me-2 text-muted"></i>
+                            <span class="text-muted">Ready to capture attendance</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Processing Animation -->
+                <div id="processingSection" class="text-center d-none">
+                    <div class="spinner-border text-primary me-2" role="status">
+                        <span class="visually-hidden">Processing...</span>
+                    </div>
+                    <span>Processing face recognition...</span>
+                </div>
+                
+                <!-- Result Section -->
+                <div id="resultSection" class="text-center d-none">
+                    <div id="resultContent"></div>
+                    <div class="mt-3">
+                        <button type="button" id="tryAgain" class="btn btn-outline-primary">
+                            <i class="fas fa-redo me-2"></i>Try Again
+                        </button>
+                        <a href="{{ url_for('student_dashboard') }}" class="btn btn-primary">
+                            <i class="fas fa-tachometer-alt me-2"></i>Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tips Section -->
+<div class="row justify-content-center mt-4">
+    <div class="col-lg-8">
+        <div class="card bg-primary bg-opacity-10 border-primary">
+            <div class="card-body">
+                <h5 class="card-title text-primary">
+                    <i class="fas fa-lightbulb me-2"></i>Tips for Better Recognition
+                </h5>
+                <div class="row">
+                    <div class="col-md-3 text-center mb-3">
+                        <i class="fas fa-sun fa-2x text-warning mb-2"></i>
+                        <h6>Good Lighting</h6>
+                        <small>Ensure your face is well-lit</small>
+                    </div>
+                    <div class="col-md-3 text-center mb-3">
+                        <i class="fas fa-eye fa-2x text-info mb-2"></i>
+                        <h6>Direct Look</h6>
+                        <small>Look directly at the camera</small>
+                    </div>
+                    <div class="col-md-3 text-center mb-3">
+                        <i class="fas fa-user fa-2x text-success mb-2"></i>
+                        <h6>Clear Face</h6>
+                        <small>Remove glasses or masks if possible</small>
+                    </div>
+                    <div class="col-md-3 text-center mb-3">
+                        <i class="fas fa-mobile-alt fa-2x text-primary mb-2"></i>
+                        <h6>Stable Position</h6>
+                        <small>Keep device steady</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/camera.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const camera = new CameraHandler();
+    let isProcessing = false;
+    
+    const startCameraBtn = document.getElementById('startCamera');
+    const markAttendanceBtn = document.getElementById('markAttendance');
+    const stopCameraBtn = document.getElementById('stopCamera');
+    const statusSection = document.getElementById('statusSection');
+    const processingSection = document.getElementById('processingSection');
+    const resultSection = document.getElementById('resultSection');
+    const tryAgainBtn = document.getElementById('tryAgain');
+    
+    startCameraBtn.addEventListener('click', function() {
+        camera.startCamera('video', 'startCamera', 'markAttendance');
+        stopCameraBtn.classList.remove('d-none');
+        updateStatus('<i class="fas fa-camera me-2 text-success"></i>Camera active - Ready to mark attendance', 'success');
+    });
+    
+    markAttendanceBtn.addEventListener('click', function() {
+        if (isProcessing) return;
+        
+        const imageData = camera.capturePhoto('video', 'canvas');
+        if (imageData) {
+            markAttendance(imageData);
+        } else {
+            updateStatus('<i class="fas fa-exclamation-triangle me-2 text-warning"></i>Failed to capture image', 'warning');
+        }
+    });
+    
+    stopCameraBtn.addEventListener('click', function() {
+        camera.stopCamera('video');
+        startCameraBtn.classList.remove('d-none');
+        markAttendanceBtn.classList.add('d-none');
+        stopCameraBtn.classList.add('d-none');
+        updateStatus('<i class="fas fa-clock me-2 text-muted"></i>Camera stopped - Click "Start Camera" to begin', 'muted');
+    });
+    
+    tryAgainBtn.addEventListener('click', function() {
+        resultSection.classList.add('d-none');
+        statusSection.classList.remove('d-none');
+        camera.startCamera('video', 'tryAgain', 'markAttendance');
+        markAttendanceBtn.classList.remove('d-none');
+        stopCameraBtn.classList.remove('d-none');
+        updateStatus('<i class="fas fa-camera me-2 text-success"></i>Camera active - Ready to mark attendance', 'success');
+    });
+    
+    function markAttendance(imageData) {
+        isProcessing = true;
+        
+        // Show processing state
+        statusSection.classList.add('d-none');
+        processingSection.classList.remove('d-none');
+        markAttendanceBtn.disabled = true;
+        
+        // Send image for recognition
+        fetch('/process_attendance', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                image: imageData
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            processingSection.classList.add('d-none');
+            resultSection.classList.remove('d-none');
+            
+            if (data.success) {
+                document.getElementById('resultContent').innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle fa-2x mb-3"></i>
+                        <h4>Attendance Marked Successfully!</h4>
+                        <p class="mb-0">${data.message}</p>
+                        ${data.student_name ? '<p class="mb-0"><strong>Student:</strong> ' + data.student_name + '</p>' : ''}
+                    </div>
+                `;
+                
+                // Stop camera after successful recognition
+                camera.stopCamera('video');
+                
+            } else {
+                document.getElementById('resultContent').innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-times-circle fa-2x mb-3"></i>
+                        <h4>Attendance Failed</h4>
+                        <p class="mb-0">${data.message}</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            processingSection.classList.add('d-none');
+            resultSection.classList.remove('d-none');
+            
+            document.getElementById('resultContent').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+                    <h4>System Error</h4>
+                    <p class="mb-0">Failed to process attendance. Please try again.</p>
+                </div>
+            `;
+        })
+        .finally(() => {
+            isProcessing = false;
+            markAttendanceBtn.disabled = false;
+        });
+    }
+    
+    function updateStatus(message, type) {
+        const statusClass = type === 'success' ? 'text-success' : 
+                          type === 'warning' ? 'text-warning' : 
+                          type === 'danger' ? 'text-danger' : 'text-muted';
+        
+        document.getElementById('recognitionStatus').innerHTML = `
+            <div class="d-flex justify-content-center align-items-center ${statusClass}">
+                ${message}
+            </div>
+        `;
+    }
+});
+</script>
+{% endblock %}
