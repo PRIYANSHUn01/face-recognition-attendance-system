@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Face Recognition Attendance System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2><i class="fas fa-tachometer-alt me-2"></i>Admin Dashboard</h2>
+                <p class="text-muted mb-0">Monitor and manage attendance system</p>
+            </div>
+            <div>
+                <button class="btn btn-outline-primary" onclick="refreshData()">
+                    <i class="fas fa-sync-alt me-2"></i>Refresh Data
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-primary bg-opacity-10 border-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h3 class="card-title text-primary">{{ total_students }}</h3>
+                        <p class="card-text">Total Students</p>
+                    </div>
+                    <i class="fas fa-users fa-2x text-primary"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-success bg-opacity-10 border-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h3 class="card-title text-success">{{ today_attendance }}</h3>
+                        <p class="card-text">Today's Attendance</p>
+                    </div>
+                    <i class="fas fa-calendar-check fa-2x text-success"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-info bg-opacity-10 border-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h3 class="card-title text-info">{{ ((today_attendance / total_students * 100) if total_students > 0 else 0)|round }}%</h3>
+                        <p class="card-text">Attendance Rate</p>
+                    </div>
+                    <i class="fas fa-percentage fa-2x text-info"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-warning bg-opacity-10 border-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h3 class="card-title text-warning">{{ total_students - today_attendance }}</h3>
+                        <p class="card-text">Absent Today</p>
+                    </div>
+                    <i class="fas fa-user-times fa-2x text-warning"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Daily Attendance Chart -->
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line me-2"></i>Daily Attendance Trend (Last 30 Days)
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="dailyAttendanceChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Top Students -->
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-trophy me-2"></i>Top Students by Attendance
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if student_stats %}
+                    {% for stat in student_stats[:5] %}
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h6 class="mb-1">{{ stat.student.full_name }}</h6>
+                            <small class="text-muted">{{ stat.student.student_id }}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-success">{{ stat.percentage }}%</span>
+                            <br>
+                            <small class="text-muted">{{ stat.present_days }}/{{ stat.total_days }}</small>
+                        </div>
+                    </div>
+                    {% if not loop.last %}<hr>{% endif %}
+                    {% endfor %}
+                {% else %}
+                <div class="text-center py-3">
+                    <i class="fas fa-chart-pie fa-2x text-muted mb-2"></i>
+                    <p class="text-muted">No attendance data available</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Real-time Attendance Heatmap Visualization -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-fire me-2"></i>Real-time Attendance Heatmap
+                </h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary" onclick="refreshHeatmaps()">
+                        <i class="fas fa-sync-alt me-1"></i>Refresh
+                    </button>
+                    <button class="btn btn-sm btn-outline-success" onclick="exportHeatmapData()">
+                        <i class="fas fa-download me-1"></i>Export
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Heatmap Navigation Tabs -->
+<div class="row mb-4">
+    <div class="col-12">
+        <ul class="nav nav-tabs" id="heatmapTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="realtime-tab" data-bs-toggle="tab" data-bs-target="#realtime" type="button" role="tab">
+                    <i class="fas fa-clock me-2"></i>Real-time Activity
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="weekly-tab" data-bs-toggle="tab" data-bs-target="#weekly" type="button" role="tab">
+                    <i class="fas fa-calendar-week me-2"></i>Weekly Heatmap
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="peak-hours-tab" data-bs-toggle="tab" data-bs-target="#peak-hours" type="button" role="tab">
+                    <i class="fas fa-chart-line me-2"></i>Peak Hours
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="trends-tab" data-bs-toggle="tab" data-bs-target="#trends" type="button" role="tab">
+                    <i class="fas fa-trending-up me-2"></i>Trends
+                </button>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<!-- Heatmap Content -->
+<div class="tab-content" id="heatmapTabContent">
+    <!-- Real-time Activity Tab -->
+    <div class="tab-pane fade show active" id="realtime" role="tabpanel">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">Today's Activity Pattern</h6>
+                    </div>
+                    <div class="card-body">
+                        <div style="height: 400px;">
+                            <canvas id="realtimeActivityChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">Live Statistics</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="realtime-stats">
+                            <div class="text-center py-3">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <p class="mt-2 text-muted">Loading real-time data...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Weekly Heatmap Tab -->
+    <div class="tab-pane fade" id="weekly" role="tabpanel">
+        <div class="row">
+            <div class="col-lg-9">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">Weekly Attendance Patterns</h6>
+                    </div>
+                    <div class="card-body">
+                        <div style="height: 400px;">
+                            <canvas id="weeklyHeatmapChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">Statistics</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="weekly-stats">
+                            <div class="text-center py-3">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <p class="mt-2 text-muted">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Peak Hours Tab -->
+    <div class="tab-pane fade" id="peak-hours" role="tabpanel">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">Peak Hours Analysis</h6>
+                    </div>
+                    <div class="card-body">
+                        <div style="height: 400px;">
+                            <canvas id="peakHoursChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">Peak Periods</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="peak-hours-info">
+                            <div class="text-center py-3">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <p class="mt-2 text-muted">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trends Tab -->
+    <div class="tab-pane fade" id="trends" role="tabpanel">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">Attendance Trends Over Time</h6>
+                    </div>
+                    <div class="card-body">
+                        <div style="height: 400px;">
+                            <canvas id="trendsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Students Table -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-users me-2"></i>All Students
+                </h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-success" onclick="exportData()">
+                        <i class="fas fa-download me-1"></i>Export
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if students %}
+                <div class="table-responsive">
+                    <table class="table table-hover" id="studentsTable">
+                        <thead>
+                            <tr>
+                                <th>Student ID</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Registration Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for student in students %}
+                            <tr>
+                                <td>{{ student.student_id }}</td>
+                                <td>{{ student.full_name }}</td>
+                                <td>{{ student.email }}</td>
+                                <td>{{ student.created_at.strftime('%B %d, %Y') }}</td>
+                                <td>
+                                    {% if student.is_active %}
+                                        <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="viewStudent({{ student.id }})">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-info" onclick="viewAttendance({{ student.id }})">
+                                        <i class="fas fa-calendar-alt"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No students registered</h5>
+                    <p class="text-muted">Students will appear here after registration.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Student Detail Modal -->
+<div class="modal fade" id="studentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Student Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="studentModalBody">
+                <!-- Student details will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Daily Attendance Chart
+    const ctx = document.getElementById('dailyAttendanceChart').getContext('2d');
+    
+    fetch('/api/attendance_data')
+        .then(response => response.json())
+        .then(data => {
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Daily Attendance',
+                        data: data.data,
+                        borderColor: 'rgb(13, 110, 253)',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Daily Attendance Overview'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        })
+        .catch(error => {
+            console.error('Error loading chart data:', error);
+        });
+});
+
+function refreshData() {
+    location.reload();
+}
+
+function viewStudent(studentId) {
+    // Placeholder for student detail view
+    alert('Student detail view - ID: ' + studentId);
+}
+
+function viewAttendance(studentId) {
+    // Placeholder for attendance view
+    alert('Attendance view for student ID: ' + studentId);
+}
+
+function exportData() {
+    // Placeholder for export functionality
+    alert('Export functionality will be implemented here');
+}
+
+// Heatmap functionality
+function refreshHeatmaps() {
+    if (window.attendanceHeatmap) {
+        window.attendanceHeatmap.refreshAll();
+    }
+}
+
+function exportHeatmapData() {
+    if (window.attendanceHeatmap) {
+        window.attendanceHeatmap.exportData();
+    }
+}
+</script>
+
+<!-- Include Heatmap JavaScript -->
+<script src="{{ url_for('static', filename='js/heatmap.js') }}"></script>
+{% endblock %}
