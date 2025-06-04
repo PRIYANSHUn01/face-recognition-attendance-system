@@ -62,30 +62,49 @@ class DeepFaceRecognitionModule:
     def preprocess_image(self, image_data):
         """Preprocess image for face recognition"""
         try:
-            if isinstance(image_data, str) and image_data.startswith('data:image'):
-                # Decode base64 image
-                image_data = image_data.split(',')[1]
-                image_bytes = base64.b64decode(image_data)
-                image = Image.open(BytesIO(image_bytes))
-                image_np = np.array(image)
+            # Handle base64 image data
+            if isinstance(image_data, str):
+                if image_data.startswith('data:image'):
+                    # Extract base64 part after comma
+                    header, encoded = image_data.split(',', 1)
+                    image_bytes = base64.b64decode(encoded)
+                    image = Image.open(BytesIO(image_bytes))
+                    # Convert PIL image to numpy array
+                    image_np = np.array(image)
+                    logging.info(f"Decoded base64 image: shape={image_np.shape}")
+                else:
+                    # Direct base64 string
+                    image_bytes = base64.b64decode(image_data)
+                    image = Image.open(BytesIO(image_bytes))
+                    image_np = np.array(image)
             else:
+                # Already numpy array
                 image_np = image_data
             
             # Validate image
-            if image_np is None or not hasattr(image_np, 'shape'):
+            if image_np is None or not hasattr(image_np, 'shape') or len(image_np.shape) < 2:
+                logging.error("Invalid image data provided")
                 return None, "Invalid image data"
             
-            # Convert to RGB if needed
+            # Ensure proper image format
             if len(image_np.shape) == 3:
                 if image_np.shape[2] == 4:  # RGBA
                     image_np = cv2.cvtColor(image_np, cv2.COLOR_RGBA2RGB)
-                elif image_np.shape[2] == 3:  # Might be BGR
-                    # Check if it's BGR by looking at the image properties
-                    image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
+                    logging.info("Converted RGBA to RGB")
+                elif image_np.shape[2] == 3:
+                    # PIL typically returns RGB, OpenCV expects BGR for some operations
+                    # Keep as RGB for face detection
+                    pass
             elif len(image_np.shape) == 2:
-                # Already grayscale, convert to RGB for consistency
+                # Grayscale - convert to RGB
                 image_np = cv2.cvtColor(image_np, cv2.COLOR_GRAY2RGB)
+                logging.info("Converted grayscale to RGB")
             
+            # Ensure proper data type
+            if image_np.dtype != np.uint8:
+                image_np = image_np.astype(np.uint8)
+            
+            logging.info(f"Preprocessed image: shape={image_np.shape}, dtype={image_np.dtype}")
             return image_np, "Success"
             
         except Exception as e:
@@ -93,41 +112,98 @@ class DeepFaceRecognitionModule:
             return None, f"Preprocessing error: {str(e)}"
     
     def detect_face(self, image):
-        """Detect face in image"""
+        """Detect face in image with improved parameters"""
         try:
             if self.face_cascade is None or self.face_cascade.empty():
+                logging.error("Face cascade not loaded properly")
                 return None, "Face detection not available"
             
-            # Convert to grayscale
+            # Convert to grayscale for detection
             if len(image.shape) == 3:
                 gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+                logging.info(f"Converted RGB to grayscale: {gray.shape}")
             else:
                 gray = image
+                logging.info(f"Using grayscale image: {gray.shape}")
             
-            # Detect faces
-            faces = self.face_cascade.detectMultiScale(
-                gray, 
-                scaleFactor=1.1, 
-                minNeighbors=5, 
-                minSize=(50, 50),
-                flags=cv2.CASCADE_SCALE_IMAGE
-            )
+            # Enhance image for better detection
+            gray = cv2.equalizeHist(gray)
+            
+            # Try multiple detection parameters for better results
+            detection_params = [
+                {'scaleFactor': 1.1, 'minNeighbors': 5, 'minSize': (30, 30)},
+                {'scaleFactor': 1.05, 'minNeighbors': 4, 'minSize': (25, 25)},
+                {'scaleFactor': 1.2, 'minNeighbors': 6, 'minSize': (40, 40)},
+                {'scaleFactor': 1.15, 'minNeighbors': 3, 'minSize': (20, 20)}
+            ]
+            
+            faces = []
+            for params in detection_params:
+                try:
+                    detected_faces = self.face_cascade.detectMultiScale(
+                        gray, 
+                        scaleFactor=params['scaleFactor'], 
+                        minNeighbors=params['minNeighbors'], 
+                        minSize=params['minSize'],
+                        flags=cv2.CASCADE_SCALE_IMAGE
+                    )
+                    if len(detected_faces) > 0:
+                        faces = detected_faces
+                        logging.info(f"Detected {len(faces)} faces with params: {params}")
+                        break
+                except Exception as e:
+                    logging.warning(f"Detection failed with params {params}: {e}")
+                    continue
             
             if len(faces) == 0:
-                return None, "No face detected"
-            elif len(faces) > 1:
-                # Choose the largest face
-                areas = [(w * h, (x, y, w, h)) for (x, y, w, h) in faces]
-                areas.sort(reverse=True)
-                face = areas[0][1]
-                logging.info(f"Multiple faces detected, using largest: {face}")
+                logging.warning("No faces detected with any parameter set")
+                return None, "No face detected in image"
+            
+            # Select the best face (largest and most centered)
+            if len(faces) > 1:
+                img_center_x, img_center_y = gray.shape[1] // 2, gray.shape[0] // 2
+                best_face = None
+                best_score = -1
+                
+                for (x, y, w, h) in faces:
+                    # Calculate face area and distance from center
+                    area = w * h
+                    face_center_x, face_center_y = x + w // 2, y + h // 2
+                    distance_from_center = ((face_center_x - img_center_x) ** 2 + 
+                                          (face_center_y - img_center_y) ** 2) ** 0.5
+                    
+                    # Score combines area (positive) and distance from center (negative)
+                    score = area - (distance_from_center * 0.5)
+                    
+                    if score > best_score:
+                        best_score = score
+                        best_face = (x, y, w, h)
+                
+                face = best_face
+                logging.info(f"Selected best face from {len(faces)} candidates: {face}")
             else:
                 face = faces[0]
+                logging.info(f"Using single detected face: {face}")
             
             x, y, w, h = face
+            
+            # Add padding around face for better recognition
+            padding = int(min(w, h) * 0.1)
+            x = max(0, x - padding)
+            y = max(0, y - padding)
+            w = min(gray.shape[1] - x, w + 2 * padding)
+            h = min(gray.shape[0] - y, h + 2 * padding)
+            
             face_roi = gray[y:y+h, x:x+w]
             
-            return face_roi, "Face detected successfully"
+            # Resize face for consistent processing
+            if face_roi.size > 0:
+                face_roi = cv2.resize(face_roi, (128, 128))
+                logging.info(f"Face extracted and resized to: {face_roi.shape}")
+                return face_roi, "Face detected successfully"
+            else:
+                logging.error("Empty face ROI extracted")
+                return None, "Failed to extract face region"
             
         except Exception as e:
             logging.error(f"Face detection error: {e}")
@@ -304,52 +380,77 @@ class DeepFaceRecognitionModule:
             return [0.0, 0.0]
     
     def compute_similarity(self, features1, features2):
-        """Compute similarity between feature vectors"""
+        """Compute similarity between feature vectors with improved accuracy"""
         try:
             if features1 is None or features2 is None:
                 return 0.0
             
             # Ensure features are numpy arrays
-            f1 = np.array(features1).flatten()
-            f2 = np.array(features2).flatten()
+            f1 = np.array(features1).flatten().astype(np.float64)
+            f2 = np.array(features2).flatten().astype(np.float64)
             
-            # Handle different lengths
-            min_len = min(len(f1), len(f2))
-            f1 = f1[:min_len]
-            f2 = f2[:min_len]
+            if len(f1) == 0 or len(f2) == 0:
+                return 0.0
+            
+            # Handle different lengths by padding with zeros
+            max_len = max(len(f1), len(f2))
+            if len(f1) < max_len:
+                f1 = np.pad(f1, (0, max_len - len(f1)), 'constant')
+            if len(f2) < max_len:
+                f2 = np.pad(f2, (0, max_len - len(f2)), 'constant')
+            
+            # Normalize features to prevent scale bias
+            f1 = (f1 - np.mean(f1)) / (np.std(f1) + 1e-8)
+            f2 = (f2 - np.mean(f2)) / (np.std(f2) + 1e-8)
             
             # Compute multiple similarity measures
+            similarities = []
             
             # 1. Cosine similarity
             norm1 = np.linalg.norm(f1)
             norm2 = np.linalg.norm(f2)
-            
-            if norm1 == 0 or norm2 == 0:
-                cosine_sim = 0.0
-            else:
+            if norm1 > 0 and norm2 > 0:
                 cosine_sim = np.dot(f1, f2) / (norm1 * norm2)
+                similarities.append(max(0, cosine_sim))
             
-            # 2. Euclidean distance (converted to similarity)
-            euclidean_dist = np.linalg.norm(f1 - f2)
-            max_dist = np.linalg.norm(f1) + np.linalg.norm(f2)
-            euclidean_sim = 1.0 - (euclidean_dist / max_dist if max_dist > 0 else 1.0)
-            
-            # 3. Correlation coefficient
+            # 2. Pearson correlation
             try:
                 correlation = np.corrcoef(f1, f2)[0, 1]
-                if np.isnan(correlation):
-                    correlation = 0.0
+                if not np.isnan(correlation):
+                    similarities.append(max(0, correlation))
             except:
-                correlation = 0.0
+                pass
+            
+            # 3. Euclidean distance (converted to similarity)
+            euclidean_dist = np.linalg.norm(f1 - f2)
+            euclidean_sim = 1.0 / (1.0 + euclidean_dist)
+            similarities.append(euclidean_sim)
+            
+            # 4. Manhattan distance (converted to similarity)
+            manhattan_dist = np.sum(np.abs(f1 - f2))
+            manhattan_sim = 1.0 / (1.0 + manhattan_dist)
+            similarities.append(manhattan_sim)
+            
+            # 5. Histogram intersection (for positive features)
+            f1_pos = np.maximum(f1, 0)
+            f2_pos = np.maximum(f2, 0)
+            if np.sum(f1_pos) > 0 and np.sum(f2_pos) > 0:
+                hist_intersection = np.sum(np.minimum(f1_pos, f2_pos)) / min(np.sum(f1_pos), np.sum(f2_pos))
+                similarities.append(hist_intersection)
             
             # Combine similarities with weights
-            combined_similarity = (
-                0.5 * cosine_sim + 
-                0.3 * euclidean_sim + 
-                0.2 * abs(correlation)
-            )
-            
-            return max(0.0, min(1.0, combined_similarity))
+            if len(similarities) > 0:
+                # Weight cosine similarity and correlation higher
+                weights = [0.3, 0.25, 0.2, 0.15, 0.1][:len(similarities)]
+                weights = weights[:len(similarities)]
+                weights = np.array(weights) / np.sum(weights)  # Normalize weights
+                
+                final_similarity = np.average(similarities, weights=weights)
+                
+                logging.info(f"Similarity calculation: {similarities} -> {final_similarity:.4f}")
+                return float(final_similarity)
+            else:
+                return 0.0
             
         except Exception as e:
             logging.error(f"Similarity computation error: {e}")
