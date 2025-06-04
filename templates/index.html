@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Face Recognition Attendance System{% endblock %}
+
+{% block content %}
+<div class="hero-section py-5">
+    <div class="row align-items-center">
+        <div class="col-lg-6">
+            <h1 class="display-4 fw-bold mb-4">
+                <i class="fas fa-brain text-primary me-3"></i>AI-Powered Attendance System
+            </h1>
+            <p class="lead mb-4">
+                Experience cutting-edge deep learning face recognition with advanced neural networks. 
+                Featuring Local Binary Patterns, Gabor filters, and PCA analysis for unmatched accuracy 
+                in attendance management for educational institutions.
+            </p>
+            
+            <div class="d-flex gap-3 flex-wrap">
+                <a href="{{ url_for('student_register') }}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-user-plus me-2"></i>Register as Student
+                </a>
+                <a href="{{ url_for('student_login') }}" class="btn btn-outline-primary btn-lg">
+                    <i class="fas fa-sign-in-alt me-2"></i>Student Login
+                </a>
+            </div>
+        </div>
+        
+        <div class="col-lg-6">
+            <div class="text-center">
+                <i class="fas fa-user-check display-1 text-primary mb-4"></i>
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="card bg-primary bg-opacity-10 border-primary">
+                            <div class="card-body text-center">
+                                <i class="fas fa-microchip fa-2x text-primary mb-2"></i>
+                                <h6>Deep Learning</h6>
+                                <small>Neural network algorithms</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="card bg-success bg-opacity-10 border-success">
+                            <div class="card-body text-center">
+                                <i class="fas fa-clock fa-2x text-success mb-2"></i>
+                                <h6>Real-time</h6>
+                                <small>Instant attendance marking</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="card bg-info bg-opacity-10 border-info">
+                            <div class="card-body text-center">
+                                <i class="fas fa-chart-line fa-2x text-info mb-2"></i>
+                                <h6>Analytics</h6>
+                                <small>Detailed reports & insights</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="card bg-warning bg-opacity-10 border-warning">
+                            <div class="card-body text-center">
+                                <i class="fas fa-mobile-alt fa-2x text-warning mb-2"></i>
+                                <h6>Mobile Ready</h6>
+                                <small>Access from any device</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-12">
+        <h2 class="text-center mb-5">Choose Your Portal</h2>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card h-100 border-primary">
+            <div class="card-body text-center p-5">
+                <div class="mb-4">
+                    <i class="fas fa-graduation-cap fa-4x text-primary"></i>
+                </div>
+                <h3 class="card-title">Student Portal</h3>
+                <p class="card-text mb-4">
+                    Register your face, mark attendance, and track your attendance history with detailed analytics.
+                </p>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('student_register') }}" class="btn btn-primary">
+                        <i class="fas fa-user-plus me-2"></i>Register Now
+                    </a>
+                    <a href="{{ url_for('student_login') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-sign-in-alt me-2"></i>Login
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card h-100 border-success">
+            <div class="card-body text-center p-5">
+                <div class="mb-4">
+                    <i class="fas fa-user-shield fa-4x text-success"></i>
+                </div>
+                <h3 class="card-title">Admin Portal</h3>
+                <p class="card-text mb-4">
+                    Monitor attendance, view comprehensive reports, and manage student records with powerful analytics.
+                </p>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('admin_login') }}" class="btn btn-success">
+                        <i class="fas fa-sign-in-alt me-2"></i>Admin Login
+                    </a>
+                    <small class="text-muted mt-2">
+                        Default: admin / admin123
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="card bg-dark border-secondary">
+            <div class="card-body">
+                <h4 class="card-title text-center mb-4">
+                    <i class="fas fa-cogs me-2"></i>System Features
+                </h4>
+                <div class="row g-4">
+                    <div class="col-md-3 text-center">
+                        <i class="fas fa-face-smile fa-3x text-primary mb-3"></i>
+                        <h6>Face Recognition</h6>
+                        <small class="text-muted">Advanced AI-powered face detection and recognition</small>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <i class="fas fa-calendar-check fa-3x text-success mb-3"></i>
+                        <h6>Smart Tracking</h6>
+                        <small class="text-muted">Automatic attendance recording with timestamp</small>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <i class="fas fa-chart-pie fa-3x text-info mb-3"></i>
+                        <h6>Visual Analytics</h6>
+                        <small class="text-muted">Interactive charts and attendance reports</small>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <i class="fas fa-lock fa-3x text-warning mb-3"></i>
+                        <h6>Secure Access</h6>
+                        <small class="text-muted">Role-based authentication and data protection</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
